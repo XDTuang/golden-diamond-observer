@@ -1310,7 +1310,7 @@ td { border-color: var(--border-light); }
     <div class="gd-gates-label">选股门控</div>
     <div class="gd-gate-seg" id="gdGateSeg">
       <button class="gd-gate" data-gate="all_a">全A</button>
-      <button class="gd-gate" data-gate="pool">当前门控（候选池）</button>
+      <button class="gd-gate" data-gate="pool">当前门控（成交额TOP800）</button>
       <button class="gd-gate" data-gate="sector_top100_to4">板块前100·换手≥4%</button>
     </div>
     <div class="gd-gate-meta" id="gdGateMeta"></div>
@@ -3409,8 +3409,12 @@ function gdSetGate(gate){
 function gdInitGates(){
   const seg=document.getElementById('gdGateSeg'); if(!seg) return;
   seg.querySelectorAll('.gd-gate').forEach(b=>{
-    b.classList.toggle('on', b.dataset.gate===GD.currentGate);
-    b.onclick=()=>gdSelectGate(b.dataset.gate);
+    const g=b.dataset.gate;
+    // 隔离策略：gate_data.json 中不存在的档（线上仅发布当前门控 pool，无全A/板块档）→ 隐藏按钮
+    if(!GD.gateData.gates[g]){ b.style.display='none'; return; }
+    b.style.display='';
+    b.classList.toggle('on', g===GD.currentGate);
+    b.onclick=()=>gdSelectGate(g);
   });
   gdUpdateGateMeta();
 }
