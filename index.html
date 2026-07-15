@@ -1494,7 +1494,7 @@ function loginGo(){
 })();
 
 // ===== 信号数据（优先使用内嵌数据，否则从 JSON 文件 fetch）=====
-// 独立版：兜宝金钻不内联主信号数据，运行时并行 fetch ./output/golden_pool_*.json 分片（替代原 4.6MB golden_diamond.json，规避 github.io 大文件限速）
+// 独立版：兜宝金钻不内联主信号数据，仅运行时 fetch ./output/golden_diamond.json
 // 注意：SIGNALS_DATA 通过 window.SIGNALS_DATA 全局访问（异步 fetch 后赋值）
 // 所有渲染函数都通过 window.SIGNALS_DATA 读取，确保拿到最新数据
 
