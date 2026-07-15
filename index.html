@@ -1494,7 +1494,7 @@ function loginGo(){
 })();
 
 // ===== 信号数据（优先使用内嵌数据，否则从 JSON 文件 fetch）=====
-// 独立版：兜宝金钻不内联主信号数据，仅运行时 fetch ./output/golden_diamond.json
+// 独立版：兜宝金钻不内联主信号数据，运行时并行 fetch ./output/golden_pool_*.json 分片（替代原 4.6MB golden_diamond.json，规避 github.io 大文件限速）
 // 注意：SIGNALS_DATA 通过 window.SIGNALS_DATA 全局访问（异步 fetch 后赋值）
 // 所有渲染函数都通过 window.SIGNALS_DATA 读取，确保拿到最新数据
 
@@ -3384,12 +3384,34 @@ function gdNormCode(c){
 
 async function loadDiamondTab(){
   if(GD.loaded) return;
-  setGdStatus('加载三档门控金钻选股结果…');
+  setGdStatus('加载原始兜宝金钻数据（分片并行）…');
   try{
-    const res=await fetch('./output/gate_data.json?'+Date.now());
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    GD.gateData=await res.json();
-    if(!GD.gateData.gates) throw new Error('数据格式异常');
+    // 读取分片清单：仅含原始兜宝金钻(pool档)，不含沙盒 all_a/sector（隔离原则）
+    const manifest = await (await fetch('./output/golden_pool_manifest.json?'+Date.now())).json();
+    if(!manifest.parts || !manifest.parts.length) throw new Error('清单为空');
+    // 并行加载所有分片并合并 stocks
+    const partJsons = await Promise.all(manifest.parts.map(p =>
+      fetch('./output/'+p+'?'+Date.now()).then(r => { if(!r.ok) throw new Error('HTTP '+r.status+' '+p); return r.json(); })
+    ));
+    const stocks = partJsons.flatMap(p => p.stocks || []);
+    // 读取 meta（label/scope_size/overview/chan）
+    const meta = await (await fetch('./output/'+manifest.meta+'?'+Date.now())).json();
+    const pool = meta.pool || {};
+    GD.gateData = {
+      data_date: meta.data_date,
+      updated_at: meta.updated_at,
+      default_gate: 'pool',
+      gates: {
+        pool: {
+          label: pool.label || '原始兜宝金钻',
+          scope_size: pool.scope_size || stocks.length,
+          overview: pool.overview || {},
+          stocks: stocks,
+          chan: pool.chan || {total:0, codes:[]}
+        }
+      }
+    };
+    if(!GD.gateData.gates.pool.stocks.length) throw new Error('数据为空');
     gdSetGate(GD.gateData.default_gate || 'pool');
     GD.loaded=true;
     gdInitGates();
@@ -3397,9 +3419,9 @@ async function loadDiamondTab(){
     gdRenderTable(GD.cache);
     gdLoadHistory();
     const g=GD.gateData.gates[GD.currentGate];
-    setGdStatus(`已加载【${g.label}】门控 · 扫描范围 ${g.scope_size} 只 · 命中 ${g.stocks.length} 只 · 数据日期 ${GD.gateData.data_date||'—'} · 点击左侧个股展开主图/副图（实时查询不依赖此文件）`);
+    setGdStatus(`已加载【原始兜宝金钻】 · 扫描范围 ${g.scope_size} 只 · 命中 ${g.stocks.length} 只 · 数据日期 ${GD.gateData.data_date||'—'} · 点击左侧个股展开主图/副图（实时查询不依赖此文件）`);
   }catch(e){
-    setGdStatus('⚠ 门控数据未生成（请先运行 gate_scan.py）。可直接用上方输入框实时查询任意个股。','err');
+    setGdStatus('⚠ 金钻数据加载失败：'+e.message+'。可直接用上方输入框实时查询任意个股。','err');
   }
 }
 function gdSetGate(gate){
