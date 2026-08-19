@@ -51,15 +51,15 @@
 
   --border: #e8ecf1;
   --border-light: #f0f2f5;
-  --border-focus: #4f6ef7;
+  --border-focus: #b8860b;
 
   --text: #1a1d2e;
   --text-secondary: #5a6178;
   --text-muted: #9ca3b8;
   --text-inverse: #ffffff;
 
-  --accent: #4f6ef7;
-  --accent-light: #6b85fa;
+  --accent: #b8860b;
+  --accent-light: #cd9b2a;
   --accent-bg: rgba(79,110,247,0.06);
   --accent-bg-hover: rgba(79,110,247,0.1);
 
@@ -71,7 +71,7 @@
   --orange-bg: rgba(237,137,54,0.06);
   --gold: #d69e2e;
   --gold-bg: rgba(214,158,46,0.06);
-  --purple: #805ad5;
+  --purple: #9c6f2a;
   --purple-bg: rgba(128,90,213,0.06);
   --blue: #3182ce;
   --cyan: #00a3c4;
@@ -117,7 +117,7 @@
   --text-muted: #656c82;
   --text-inverse: #0a0c12;
 
-  --accent: #6b85fa;
+  --accent: #e3b341;
   --accent-light: #8ba0fb;
   --accent-bg: rgba(107,133,250,0.10);
   --accent-bg-hover: rgba(107,133,250,0.16);
@@ -132,7 +132,7 @@
   --gold-strong: #f0c04e;
   --gold-bg: rgba(230,181,60,0.10);
   --gold-bg-strong: rgba(230,181,60,0.16);
-  --purple: #b794f4;
+  --purple: #c79a4e;
   --purple-bg: rgba(183,148,244,0.12);
   --blue: #63b3ed;
   --cyan: #5fd4e6;
@@ -1086,13 +1086,13 @@ td { border-color: var(--border-light); }
 .login-overlay canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 .login-box{position:relative;z-index:1;width:400px;max-width:92vw;background:#111827;border:1px solid #1e293b;border-radius:14px;padding:36px 32px;box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .login-logo{text-align:center;margin-bottom:28px}
-.login-logo .ld{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;font-size:22px;font-weight:800;margin-bottom:12px;box-shadow:0 2px 12px rgba(99,102,241,.3)}
-.login-logo h1{font-size:20px;font-weight:800;background:linear-gradient(135deg,#e2e8f0,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.login-logo .ld{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#e3b341,#c79a4e);color:#fff;font-size:22px;font-weight:800;margin-bottom:12px;box-shadow:0 2px 12px rgba(227,179,65,.3)}
+.login-logo h1{font-size:20px;font-weight:800;background:linear-gradient(135deg,#f0c95e,#cd9b2a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .login-logo .sub{font-size:12px;color:#64748b;margin-top:4px}
 .login-lv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
 .login-lv button{padding:12px 8px;border:1px solid #1e293b;border-radius:10px;background:transparent;color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .2s}
-.login-lv button:hover{border-color:#6366f1;color:#e2e8f0}
-.login-lv button.on{border-color:#6366f1;background:rgba(99,102,241,.1);color:#818cf8}
+.login-lv button:hover{border-color:#e3b341;color:#e2e8f0}
+.login-lv button.on{border-color:#e3b341;background:rgba(227,179,65,.1);color:#e3b341}
 .login-lv button.on.admin{border-color:#f59e0b;background:rgba(245,158,11,.1);color:#f59e0b}
 .login-lv .ic{font-size:20px}
 .login-lv .hint{font-size:10px;color:#64748b;font-weight:400}
@@ -1100,11 +1100,11 @@ td { border-color: var(--border-light); }
 .login-ig label{display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:6px}
 .login-pw{position:relative}
 .login-pw input{width:100%;padding:12px 44px 12px 14px;font-size:15px;border:1px solid #334155;border-radius:10px;background:#0f172a;color:#e2e8f0;outline:none;font-family:"SF Mono",Menlo,monospace;letter-spacing:3px}
-.login-pw input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.login-pw input:focus{border-color:#e3b341;box-shadow:0 0 0 3px rgba(227,179,65,.15)}
 .login-pw .eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:4px}
 .login-em{font-size:11px;color:#ef4444;margin-top:6px;min-height:16px;opacity:0;transition:opacity .2s}
 .login-em.on{opacity:1}
-.login-btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;transition:all .2s}
+.login-btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#e3b341,#c79a4e);color:#fff;transition:all .2s}
 .login-btn:hover{box-shadow:0 4px 16px rgba(99,102,241,.3)}
 .login-loading{display:none;position:fixed;inset:0;z-index:100;background:rgba(10,14,23,.95);flex-direction:column;align-items:center;justify-content:center}
 .login-loading.show{display:flex}
@@ -1114,7 +1114,7 @@ td { border-color: var(--border-light); }
 .login-ld{display:inline-block;animation:loginDots 1.2s infinite}
 @keyframes loginDots{0%,20%{opacity:0}50%{opacity:1}100%{opacity:0}}
 .login-pb{width:180px;height:3px;background:rgba(99,102,241,.1);border-radius:2px;margin-top:20px;overflow:hidden}
-.login-pf{height:100%;background:linear-gradient(90deg,#6366f1,#a78bfa);border-radius:2px;animation:loginPg 1.8s ease-in-out infinite}
+.login-pf{height:100%;background:linear-gradient(90deg,#e3b341,#cd9b2a);border-radius:2px;animation:loginPg 1.8s ease-in-out infinite}
 @keyframes loginPg{0%{width:0}50%{width:65%}100%{width:100%}}
 @keyframes loginShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 </style>
@@ -1220,13 +1220,13 @@ td { border-color: var(--border-light); }
 
 <div class="login-loading" id="loginLoading">
   <div class="login-rocket"><svg viewBox="0 0 100 160" width="100" height="160">
-    <rect x="35" y="65" width="30" height="60" rx="6" fill="#6366f1"/>
-    <path d="M35,65 Q50,30 65,65 Z" fill="#818cf8"/>
-    <circle cx="50" cy="90" r="8" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+    <rect x="35" y="65" width="30" height="60" rx="6" fill="#e3b341"/>
+    <path d="M35,65 Q50,30 65,65 Z" fill="#f0c95e"/>
+    <circle cx="50" cy="90" r="8" fill="#1e293b" stroke="#e3b341" stroke-width="1.5"/>
     <circle cx="47.5" cy="90" r="2" fill="#fff"/><circle cx="52.5" cy="90" r="2" fill="#fff"/>
     <path d="M49,93 L50,93 L50,94 Z" fill="#f472b6"/>
-    <path d="M35,80 L27,88 L35,96 Z" fill="#6366f1" opacity=".7"/>
-    <path d="M65,80 L73,88 L65,96 Z" fill="#6366f1" opacity=".7"/>
+    <path d="M35,80 L27,88 L35,96 Z" fill="#e3b341" opacity=".7"/>
+    <path d="M65,80 L73,88 L65,96 Z" fill="#e3b341" opacity=".7"/>
     <path d="M35,120 L22,128 L35,126 Z" fill="#a78bfa" opacity=".7"/>
     <path d="M65,120 L78,128 L65,126 Z" fill="#a78bfa" opacity=".7"/>
     <ellipse cx="50" cy="140" rx="10" ry="14" fill="#f59e0b" opacity=".8"/>
