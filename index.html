@@ -1320,6 +1320,23 @@ html { scroll-behavior: smooth; }
 <main class="main">
 
 <!-- Tab: 总览 -->
+<div class="tab-content" id="tab-dailyreview">
+<style>
+.dr-h{font-size:14px;font-weight:600;color:var(--text);margin:12px 0 4px}
+.dr-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.dr-tbl th,.dr-tbl td{padding:5px 9px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+.dr-tbl th:first-child,.dr-tbl td:first-child{text-align:left}
+.dr-tbl th{color:var(--text-muted);font-weight:600}
+.dr-up{color:var(--red)}.dr-dn{color:var(--green)}
+.dr-tag{font-size:11px;color:var(--text-muted)}
+.dr-note{font-size:12.5px;color:var(--text-secondary);margin:6px 0}
+.dr-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:12px 0}
+</style>
+<div class="dr-card" id="drMarket"><p class="dr-note">行情加载中…</p></div>
+<div class="dr-card" id="drAnalysis"><p class="dr-note">分析区加载中…</p></div>
+</div>
+
+<!-- Tab: 实时盯盘 -->
 <div class="tab-content" id="tab-realtime">
 <style>
 
@@ -2815,6 +2832,289 @@ function renderFourVolumeChart(containerId, fv) {
   container.appendChild(labelDiv);
 }
 
+
+
+
+
+
+
+
+
+
+// ===== 每日复盘 Tab =====
+function renderDailyReview() {
+  if (window._drInit) return; window._drInit = true;
+  const mkt = document.getElementById('drMarket');
+  const ana = document.getElementById('drAnalysis');
+  const loadAna = (d) => {
+    if (!ana) return;
+    const q = (d && d.quotes) || {};
+    fetch('./data/daily_review/analysis.html', { cache: 'no-store' }).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(t => {
+      // 保留 analysis.html 的"3·隔夜美股复盘"模块（含 agent 推演结论），
+      // 仅用 market.json.us_kline 把双日表数据+说明日期刷新到最新（drRefreshUsDualDayTables）
+      ana.innerHTML = t;
+      drFillTables(q);
+      if (d && d.us_kline) drRefreshUsDualDayTables(d);
+      if (d && d.comm) drRefreshCommRates(d);
+      drLoadTop10();
+      drLoadDiamond();
+    }).catch(err => {
+      ana.innerHTML = `<p class="dr-note">分析区加载失败：${err}</p>`;
+    });
+  };
+  if (mkt) {
+    fetch('./data/daily_review/market.json', { cache: 'no-store' }).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(d => {
+      const q = d.quotes || {};
+      const cnt = Object.values(q).filter(v => !v.error).length;
+      mkt.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <b>📊 行情数据（${d.date}）</b><span class="dr-tag">${cnt} 标的 · ${d.source}</span>
+        <span class="dr-tag">云端 08:15 自动更新</span></div>`;
+      // 保留 analysis.html 的"3"模块，仅刷新数据
+      loadAna(d);
+    }).catch(err => {
+      mkt.innerHTML = `<p class="dr-note">行情加载失败：${err}</p>`;
+      loadAna();
+    });
+  } else {
+    loadAna();
+  }
+}
+
+/* ═══════ 隔夜美股复盘（保留 analysis.html 模块，仅刷新双日表数据+说明日期，数据源 market.json.us_kline） ═══════ */
+function drRefreshUsDualDayTables(d) {
+  const ana = document.getElementById('drAnalysis');
+  if (!ana) return;
+  const k = d.us_kline;
+  if (!k || Object.keys(k).length === 0) return;
+  const sample = k.us_dji || Object.values(k)[0];
+  if (!sample || !sample.latest || !sample.prev) return;
+  const latestDate = sample.latest.date, prevDate = sample.prev.date;
+  const fmt = (s) => (s || '').slice(5).replace('-', '/');  // 2026-08-24 -> 08/24
+  // 1. 定位"3 · 隔夜美股复盘"标题
+  const heads = Array.prototype.slice.call(ana.querySelectorAll('.dr-h'));
+  const h3 = heads.find(h => /3\s*[·・.]?\s*隔夜美股复盘/.test(h.textContent || ''));
+  if (!h3) return;
+  const card = h3.nextElementSibling;
+  if (!card || !card.querySelector) return;
+  // 2. 更新说明文字日期（"为什么双日"段）
+  Array.prototype.slice.call(card.querySelectorAll('.dr-note')).forEach(n => {
+    const t = n.innerHTML || '';
+    if (t.indexOf('为什么双日') >= 0) {
+      n.innerHTML = t
+        .replace(/映射源（[\d/．. ]+）/, '映射源（' + fmt(prevDate) + '）')
+        .replace(/隔夜（[\d/．. ]+）/, '隔夜（' + fmt(latestDate) + '）')
+        .replace(/<b>说明：[\s\S]*?<\/b>/, '<b>说明：隔夜最新 = ' + latestDate + '（最新已收盘美股交易日），前一交易日 = ' + prevDate + '</b>');
+    }
+  });
+  // 3. 更新双日表（表头含"涨跌（映射源）"）
+  const tables = Array.prototype.slice.call(card.querySelectorAll('table.dr-tbl'));
+  const dual = tables.find(t => (t.innerHTML || '').indexOf('涨跌（映射源）') >= 0);
+  if (!dual) return;
+  const thead = dual.querySelector('thead tr');
+  if (thead && thead.children.length >= 5) {
+    thead.children[1].textContent = fmt(prevDate) + ' 收盘';
+    thead.children[2].textContent = fmt(prevDate) + ' 涨跌（映射源）';
+    thead.children[3].textContent = fmt(latestDate) + ' 收盘';
+    thead.children[4].textContent = fmt(latestDate) + ' 涨跌（隔夜）';
+  }
+  // 4. 刷新 tbody（us_kline 数据驱动；费城半导体等无 us_kline 的行保留原文）
+  const nameMap = {
+    '道琼斯':'us_dji', '标普 500':'us_inx', '标普500':'us_inx', '纳斯达克':'us_ixic',
+    'MU 美光':'us_mu', 'SNDK 闪迪':'us_sndk', 'MRVL 迈威尔':'us_mrvl', 'LITE 朗美通':'us_lite',
+    'AAOI':'us_aaoi', 'WDC 西部数据':'us_wdc', 'COHR':'us_cohr', 'SKHY 海力士':'us_skhy',
+  };
+  const tbody = dual.querySelector('tbody');
+  if (!tbody) return;
+  Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(tr => {
+    const td = tr.children;
+    if (!td || td.length < 5) return;
+    const nm = (td[0].textContent || '').replace(/\s+/g, ' ').trim();
+    const key = nameMap[nm];
+    const e = key && k[key];
+    if (!e) return;  // 费城半导体等无数据行保留 agent 原文
+    const l = e.latest, p = e.prev;
+    const cls = (v) => v >= 0 ? 'dr-up' : 'dr-dn';
+    const sign = (v) => v >= 0 ? '+' : '';
+    td[1].textContent = p.close.toLocaleString();
+    td[2].textContent = sign(p.chg_pct) + p.chg_pct.toFixed(2) + '%';
+    td[2].className = cls(p.chg_pct);
+    td[3].textContent = l.close.toLocaleString();
+    const ov = (l.close / p.close - 1) * 100;
+    td[4].textContent = sign(ov) + ov.toFixed(2) + '%';
+    td[4].className = cls(ov);
+  });
+  // 5. 隐藏 agent 写的过时"双日结论"推演文字（8/21 口径，无法自动更新），
+  //    由数据驱动的最新摘要（客观数据）接管该位置
+  const notes = Array.prototype.slice.call(card.querySelectorAll('.dr-note'));
+  const concl = notes.find(n => (n.textContent || '').indexOf('双日结论') >= 0);
+  if (concl) {
+    concl.style.cssText = 'display:none';  // 隐藏过时推演，保留模块结构
+    const idxRows = ['us_dji','us_inx','us_ixic'];
+    const parts = idxRows.filter(x => k[x]).map(x => {
+      const nm = {us_dji:'道指', us_inx:'标普', us_ixic:'纳指'}[x];
+      const pct = (k[x].latest.close / k[x].prev.close - 1) * 100;
+      return nm + ' ' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    });
+    const div = document.createElement('div');
+    div.className = 'dr-note';
+    div.style.cssText = 'background:var(--bg-subtle);border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;margin-top:6px';
+    div.innerHTML = '<b>数据刷新（' + latestDate + ' 收盘，自动）：</b>' + parts.join(' · ') + '。推演结论请以本机 agent 重跑后的分析为准。';
+    concl.parentNode.insertBefore(div, concl.nextSibling);
+  }
+}
+
+/* ═══════ 商品·利率·汇率表（保留 analysis.html 表结构，用 market.json.comm 刷新数据+动态标注） ═══════ */
+function drRefreshCommRates(d) {
+  const ana = document.getElementById('drAnalysis');
+  if (!ana) return;
+  const comm = d.comm;
+  if (!comm || Object.keys(comm).length === 0) return;
+  const heads = Array.prototype.slice.call(ana.querySelectorAll('.dr-h'));
+  const h3 = heads.find(h => /3\s*[·・.]?\s*隔夜美股复盘/.test(h.textContent || ''));
+  if (!h3) return;
+  const card = h3.nextElementSibling;
+  if (!card || !card.querySelector) return;
+  const tables = Array.prototype.slice.call(card.querySelectorAll('table.dr-tbl'));
+  const commTbl = tables.find(t => (t.innerHTML || '').indexOf('商品') >= 0 && (t.innerHTML || '').indexOf('汇率') >= 0);
+  if (!commTbl) return;
+  // 行名 -> comm key
+  const map = {
+    '现货黄金':'gold_spot', 'COMEX 黄金':'gold_comex', 'WTI 原油':'wti', '布伦特':'brent',
+    '10Y 美债':'us10y', '30Y 美债':'us30y', '人民币中间价':'cny',
+  };
+  const tbody = commTbl.querySelector('tbody');
+  if (!tbody) return;
+  Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(tr => {
+    const td = tr.children;
+    if (!td || td.length < 3) return;
+    const nm = (td[0].textContent || '').trim();
+    const key = nm.indexOf('碳酸锂') >= 0 ? 'lithium' : map[nm];
+    const e = key && comm[key];
+    if (!e || e.value == null) return;
+    td[1].textContent = e.value.toLocaleString() + (nm.indexOf('美债') >= 0 ? '%' : '');
+    if (e.chg_pct != null) {
+      const cls = e.chg_pct >= 0 ? 'dr-up' : 'dr-dn';
+      td[2].textContent = (e.chg_pct >= 0 ? '+' : '') + e.chg_pct.toFixed(2) + '%';
+      td[2].className = cls;
+    } else if (e.date) {
+      td[2].textContent = (td[2].textContent || '') + '（' + e.date.slice(5) + '）';
+    }
+  });
+  // 更新表底标注：来源 → 数据自动刷新日期（美元指数/伦铜无免费实时源，仍待本机补抓）
+  const notes = Array.prototype.slice.call(card.querySelectorAll('.dr-note'));
+  const src = notes.find(n => (n.textContent || '').indexOf('来源') >= 0);
+  if (src) {
+    const dates = Object.keys(comm).map(k => comm[k].date).filter(Boolean);
+    const latest = dates.sort().pop() || '';
+    src.innerHTML = '<span style="color:var(--text-muted)">来源：腾讯hf国际商品 · 乐咕美债 · 中行中间价 · 广期所主连（数据自动刷新至 ' +
+      (latest || '—') + '；美元指数/伦铜无免费实时源，仍待本机补抓）</span>';
+  }
+}
+function drFillTables(q) {
+  const mk = (items) => {
+    if (!items || !items.length) return '<div class="dr-note">【待本机补全】</div>';
+    let h = '<table class="dr-tbl"><thead><tr><th>名称</th><th>收盘</th><th>涨跌幅</th><th>最高</th><th>最低</th></tr></thead><tbody>';
+    items.forEach(v => {
+      const n = parseFloat(v.chg_pct);
+      const cls = n > 0 ? 'dr-up' : (n < 0 ? 'dr-dn' : '');
+      h += `<tr><td>${v.name}</td><td>${v.close}</td>
+        <td class="${cls}">${v.chg_pct}%</td><td>${v.high}</td><td>${v.low}</td></tr>`;
+    });
+    return h + '</tbody></table>';
+  };
+  const g = (group) => Object.values(q).filter(v => v.group === group && !v.error);
+  const tA = document.getElementById('drTblA'); if (tA) tA.innerHTML = mk(g('A股指数'));
+  const tH = document.getElementById('drTblH'); if (tH) tH.innerHTML = mk(g('持仓股'));
+  const tU = document.getElementById('drTblUs');
+  if (tU) tU.innerHTML = mk([...g('美股指数'), ...g('美股映射'), ...g('美股映射·参考')]);
+}
+
+// ===== 每日复盘：前一日 TOP10（output/top10_history.json 最新交易日）=====
+function drLoadTop10() {
+  const el = document.getElementById('drTblTop10');
+  if (!el) return;
+  fetch('./output/top10_history.json', { cache: 'no-store' }).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(hist => {
+    const dates = Object.keys(hist || {}).filter(d => hist[d] && Array.isArray(hist[d].top10) && hist[d].top10.length);
+    if (!dates.length) { el.innerHTML = '<div class="dr-note">暂无 TOP10 历史数据</div>'; return; }
+    dates.sort();
+    const last = dates[dates.length - 1];
+    const stocks = hist[last].top10;
+    let h = `<div class="dr-tag" style="margin-bottom:4px">数据日：${last} ｜ 共 ${stocks.length} 只（与总站首页 TOP 表一致）</div>`;
+    h += '<table class="dr-tbl"><thead><tr><th>#</th><th>股票</th><th>市场</th><th>信号等级</th><th>EMA</th><th>评分</th><th>涨跌</th><th>收盘</th></tr></thead><tbody>';
+    stocks.forEach((r, i) => {
+      const chg = Number(r.change_pct) || 0;
+      const cls = chg > 0 ? 'dr-up' : (chg < 0 ? 'dr-dn' : '');
+      const mkt = r.market || '主板';
+      h += `<tr><td>${i + 1}</td><td><b>${r.name}</b> <span style="font-size:11px;color:var(--text-muted)">${r.code}</span></td>
+        <td>${mkt}</td><td>${r.grade || '—'}</td><td>${r.ema_score != null ? r.ema_score + '/7' : '—'}</td>
+        <td style="font-weight:700">${r.total_score != null ? r.total_score : '—'}</td>
+        <td class="${cls}">${chg > 0 ? '+' : ''}${chg.toFixed(2)}%</td><td>¥${(Number(r.close) || 0).toFixed(2)}</td></tr>`;
+    });
+    h += '</tbody></table>';
+    el.innerHTML = h;
+  }).catch(err => {
+    el.innerHTML = `<div class="dr-note">TOP10 加载失败：${err}</div>`;
+  });
+}
+
+// ===== 每日复盘：前一日金钻（output/gate_data.json 三个门控分类）=====
+function drLoadDiamond() {
+  const el = document.getElementById('drTblDiamond');
+  if (!el) return;
+  fetch('./output/gate_data.json', { cache: 'no-store' }).then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(g => {
+    const gates = g.gates || {};
+    const GATE_ORDER = ['all_a', 'pool', 'sector_top100_to4'];
+    const keys = GATE_ORDER.filter(k => gates[k]);
+    if (!keys.length) { el.innerHTML = '<div class="dr-note">暂无金钻门控数据</div>'; return; }
+    const date = g.data_date || '';
+    let h = `<div class="dr-tag" style="margin-bottom:4px">数据日：${date} ｜ 门控：${keys.map(k => gates[k].label).join(' / ')}</div>`;
+    keys.forEach(k => {
+      const gk = gates[k];
+      const ov = gk.overview || {};
+      const stocks = gk.stocks || [];
+      h += `<div style="margin:10px 0 4px;font-weight:600">${gk.label}（扫描 ${gk.scope_size} 只）— 命中 ${ov.total || stocks.length} 只</div>`;
+      if (ov.analysis) h += `<div class="dr-note" style="font-size:12px;color:var(--text-secondary)">${ov.analysis}</div>`;
+      if (!stocks.length) { h += '<div class="dr-note">无命中</div>'; return; }
+      h += '<table class="dr-tbl"><thead><tr><th>股票</th><th>分类</th><th>信号日期</th><th>涨跌幅</th><th>阳线</th><th>DY2</th><th>MA5&gt;MA60</th></tr></thead><tbody>';
+      stocks.forEach(s => {
+        const sig = (s.signals && s.signals[0]) || {};
+        const det = sig.detail || {};
+        const pct = det.pct != null ? Number(det.pct) : null;
+        const pctCls = pct > 0 ? 'dr-up' : (pct < 0 ? 'dr-dn' : '');
+        const prim = s.primary || sig.type || '—';
+        const primCls = prim.includes('起涨') ? 'color:var(--red);font-weight:700'
+          : (prim.includes('买入') ? 'color:var(--blue);font-weight:600'
+          : 'color:var(--gold);font-weight:600');
+        const dy2 = det.dy2 != null ? Number(det.dy2) : null;
+        h += `<tr><td><b>${s.name}</b> <span style="font-size:11px;color:var(--text-muted)">${s.code}</span></td>
+          <td style="${primCls}">${prim}</td>
+          <td>${sig.date || '—'}</td>
+          <td class="${pctCls}">${pct != null ? (pct > 0 ? '+' : '') + pct.toFixed(2) + '%' : '—'}</td>
+          <td>${det.yang ? '✓' : (det.yang === false ? '✗' : '—')}</td>
+          <td>${dy2 != null ? dy2.toFixed(3) : '—'}</td>
+          <td>${det['ma5>ma60'] ? '✓' : (det['ma5>ma60'] === false ? '✗' : '—')}</td></tr>`;
+      });
+      h += '</tbody></table>';
+    });
+    el.innerHTML = h;
+  }).catch(err => {
+    el.innerHTML = `<div class="dr-note">金钻数据加载失败：${err}</div>`;
+  });
+}
+
+
 // ===== Tab 切换 =====
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2826,6 +3126,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.tab === 'all') renderAll();
     if (btn.dataset.tab === 'pool') renderObservationPool();
     if (btn.dataset.tab === 'signalstock') renderSignalPickCards();
+    if (btn.dataset.tab === 'dailyreview') renderDailyReview();
     if (btn.dataset.tab === 'diamond') loadDiamondTab();
     // 切换到含股票卡片的Tab时，限定在对应 grid 内渲染迷你图（避免 ID 重复冲突）
     const gridMap = { short:'shortGrid', long:'longGrid', emascan:'emaGrid', all:'allGrid' };
@@ -5713,6 +6014,235 @@ if (_eventcalBtn) {
     eventcalJumpToday();
   });
 }
+
+/* ═══════════ touzid 融合：市场温度计 / 估值雷达 / 股东户数 ═══════════ */
+let THERMO_DATA = null, VAL_RADAR_DATA = null, INST_FLOW_DATA = null, VIX_PANEL_DATA = null;
+let _thermoChart = null, _thermoMetric = 'graham', _vixChart = null;
+
+// VIX 色标：值越高越恐慌（红=恐慌，绿=平静）
+function vixTag(v, hi, lo) {
+  if (v == null) return '<span class="thermo-tag thermo-mid">—</span>';
+  const cls = v >= hi ? 'thermo-hot' : v <= lo ? 'thermo-cool' : 'thermo-warm';
+  return '<span class="thermo-tag ' + cls + '">' + v + '</span>';
+}
+
+// 温度色标：估值热度（红=过热/贵，绿=低估/便宜）— 与 A 股红涨绿跌语义一致
+function thermoTag(v, low, high, invert) {
+  if (v == null) return '<span class="thermo-tag thermo-mid">无数据</span>';
+  let cls;
+  if (invert) { // 数值越大越便宜（格雷厄姆指数/破净率/ERP）
+    cls = v >= high ? 'thermo-cool' : v <= low ? 'thermo-hot' : (v > (low + high) / 2 ? 'thermo-warm' : 'thermo-mid');
+  } else {      // 数值越大越贵（分位/指数）
+    cls = v >= high ? 'thermo-hot' : v <= low ? 'thermo-cool' : (v > (low + high) / 2 ? 'thermo-warm' : 'thermo-mid');
+  }
+  return '<span class="thermo-tag ' + cls + '">' + (v > 100 ? v.toFixed(0) : v) + '</span>';
+}
+
+function loadThermometer() {
+  const sec = document.getElementById('thermoSection');
+  if (!sec) return;
+  fetch('./output/market_thermometer.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(d => {
+      THERMO_DATA = d;
+      renderThermometer();
+    })
+    .catch(e => {
+      document.getElementById('thermoCards').innerHTML =
+        '<p class="dr-note" style="grid-column:1/-1;margin:0">温度计数据加载失败：' + e.message + '</p>';
+    });
+}
+
+function renderThermometer() {
+  const d = THERMO_DATA; if (!d) return;
+  const s = d.snapshot || {};
+  document.getElementById('thermoDate').textContent = '数据日期 ' + (s.date || '');
+  const cards = [
+    { label: '格雷厄姆指数', val: s.graham, sub: '盈利收益率÷10Y国债', tag: thermoTag(s.graham, 0.8, 2, true), note: '>2 股票显著便宜' },
+    { label: '巴菲特指数', val: s.buffett, sub: '总市值÷GDP(TTM)', tag: thermoTag(s.buffett, 0.6, 1.0, true), note: '>1 市值偏贵' },
+    { label: '全A破净率', val: s.below_net_ratio, sub: 'PB<1 家数占比', tag: thermoTag(s.below_net_ratio, 3, 10, true), note: '>10% 深度低估' },
+    { label: 'PE 分位(10y)', val: s.pe_pct_10y, sub: '全A PE 历史分位', tag: thermoTag(s.pe_pct_10y, 20, 80, false), note: '>80% 过热' },
+    { label: 'PB 分位(10y)', val: s.pb_pct_10y, sub: '全A PB 历史分位', tag: thermoTag(s.pb_pct_10y, 20, 80, false), note: '>80% 过热' },
+    { label: '股债收益差', val: s.erp, sub: '1/PE−10Y国债', tag: thermoTag(s.erp, 2, 5, true), note: '>5% 股票占优' },
+  ];
+  document.getElementById('thermoCards').innerHTML = cards.map(c => {
+    const v = c.val == null ? '—' : (c.val > 100 ? c.val.toFixed(0) : c.val);
+    return '<div class="thermo-card"><div class="thermo-label">' + c.label + c.tag + '</div>' +
+      '<div class="thermo-val">' + v + '</div><div class="thermo-sub">' + c.sub + '</div></div>';
+  }).join('');
+  if ((d.history || []).length > 20) {
+    document.getElementById('thermoChartWrap').style.display = '';
+    document.querySelectorAll('#thermoMetrics .thermo-metric').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('#thermoMetrics .thermo-metric').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        _thermoMetric = b.dataset.metric;
+        renderThermoChart();
+      };
+    });
+    renderThermoChart();
+  }
+}
+
+function renderThermoChart() {
+  const dom = document.getElementById('thermoChart');
+  if (!dom || !THERMO_DATA || !THERMO_DATA.history) return;
+  if (!_thermoChart) _thermoChart = echarts.init(dom);
+  const hist = THERMO_DATA.history.filter(h => h[_thermoMetric] != null);
+  const labels = { graham: '格雷厄姆指数', pe: '全A PE', pb_pct: 'PB 分位 %(近5年)', below_net_ratio: '破净率 %' };
+  const isPct = _thermoMetric === 'pb_pct' || _thermoMetric === 'below_net_ratio';
+  const series = isPct ? hist.map(h => h[_thermoMetric]) : hist.map(h => h[_thermoMetric]);
+  _thermoChart.setOption({
+    backgroundColor: 'transparent',
+    grid: { left: 48, right: 16, top: 24, bottom: 28 },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: hist.map(h => h.date.slice(5)), axisLine: { lineStyle: { color: '#888' } },
+      axisLabel: { color: '#999', fontSize: 10 } },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: 'rgba(128,128,128,.15)' } },
+      axisLabel: { color: '#999', fontSize: 10 } },
+    series: [{ type: 'line', name: labels[_thermoMetric] || _thermoMetric, data: series, symbol: 'none',
+      lineStyle: { width: 2, color: '#4f6ef7' }, areaStyle: { color: 'rgba(79,110,247,.12)' } }]
+  }, true);
+}
+
+function loadValRadar() {
+  const sec = document.getElementById('valRadarSection');
+  if (!sec) return;
+  fetch('./output/valuation_band.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(d => { VAL_RADAR_DATA = d; renderValRadar(); })
+    .catch(e => {
+      document.getElementById('valRadarGrid').innerHTML =
+        '<p class="dr-note">估值数据加载失败：' + e.message + '</p>';
+    });
+}
+
+function renderValRadar() {
+  const d = VAL_RADAR_DATA; if (!d) return;
+  const items = (d.items || []).filter(i => i.pe_pct_5y != null);
+  document.getElementById('valRadarMeta').textContent = '命中 ' + d.count + ' 只 · ' + (d.date || '');
+  const low = items.slice().sort((a, b) => a.pe_pct_5y - b.pe_pct_5y).slice(0, 10);
+  const high = items.slice().sort((a, b) => b.pe_pct_5y - a.pe_pct_5y).slice(0, 10);
+  const colHtml = (list, label, cls) => {
+    const rows = list.map(i => {
+      const p = i.pe_pct_5y;
+      return '<div class="val-row"><span class="val-name" title="' + i.name + ' ' + i.tag + '">' + i.name + '</span>' +
+        '<div class="val-bar"><div class="val-fill" style="width:' + p + '%;background:' + cls + '"></div></div>' +
+        '<span class="val-num">' + p.toFixed(0) + '%</span>' +
+        '<span class="val-num" style="color:var(--text-muted);font-size:11px">PE ' + (i.pe ?? '—') + '</span></div>';
+    }).join('');
+    return '<div class="val-radar-col"><div class="val-radar-h">' + label + '</div>' + rows + '</div>';
+  };
+  document.getElementById('valRadarGrid').innerHTML =
+    (items.length ? colHtml(low, '🟢 低估机会（PE分位↓）', 'var(--green)') : '') +
+    (items.length ? colHtml(high, '🔴 高位警示（PE分位↑）', 'var(--red)') : '<p class="dr-note">暂无估值分位数据</p>');
+}
+
+function loadInstFlow() {
+  const card = document.getElementById('instFlowCard');
+  if (!card) return;
+  fetch('./output/institutional_flow.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(d => { INST_FLOW_DATA = d; renderInstFlow(); })
+    .catch(e => {
+      document.getElementById('instFlowGrid').innerHTML =
+        '<p class="dr-note">户数数据加载失败：' + e.message + '</p>';
+    });
+}
+
+function renderInstFlow() {
+  const d = INST_FLOW_DATA; if (!d) return;
+  const items = (d.items || []).filter(i => i.holders_chg_pct != null);
+  document.getElementById('instFlowMeta').textContent = (d.report || '') + ' · 命中 ' + d.count + ' 只';
+  const conc = items.slice().sort((a, b) => a.holders_chg_pct - b.holders_chg_pct).slice(0, 10);
+  const disp = items.slice().sort((a, b) => b.holders_chg_pct - a.holders_chg_pct).slice(0, 10);
+  const colHtml = (list, label, cls) => {
+    const rows = list.map(i => {
+      const p = i.holders_chg_pct;
+      return '<div class="inst-row"><span class="inst-name" title="' + i.name + ' ' + (i.tag || '') + '">' + i.name + '</span>' +
+        '<span class="dr-tag">' + (i.tag || '') + '</span>' +
+        '<span class="inst-chg ' + cls + '">' + (p > 0 ? '+' : '') + p.toFixed(1) + '%</span></div>';
+    }).join('');
+    return '<div class="inst-col"><div class="inst-h">' + label + '</div>' + rows + '</div>';
+  };
+  document.getElementById('instFlowGrid').innerHTML =
+    (conc.length ? colHtml(conc, '🔴 筹码集中（户数↓）', 'inst-conc') : '') +
+    (disp.length ? colHtml(disp, '🟢 筹码分散（户数↑）', 'inst-disp') : '<p class="dr-note">暂无户数数据</p>');
+}
+
+function loadVixPanel() {
+  const sec = document.getElementById('vixSection');
+  if (!sec) return;
+  fetch('./output/vix_panel.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(d => { VIX_PANEL_DATA = d; renderVixPanel(); })
+    .catch(e => {
+      document.getElementById('vixCards').innerHTML =
+        '<p class="dr-note" style="grid-column:1/-1;margin:0">波动率数据加载失败：' + e.message + '</p>';
+    });
+}
+
+function renderVixPanel() {
+  const d = VIX_PANEL_DATA; if (!d) return;
+  const cards = [];
+  // CBOE VIX
+  const v = d.cboe_vix || {};
+  if (v.value != null) {
+    const chg = v.chg_pct != null;
+    cards.push('<div class="vix-card"><div class="vix-label">CBOE VIX 恐慌指数' + vixTag(v.value, 30, 15) + '</div>' +
+      '<div class="vix-val">' + v.value + '</div>' +
+      '<div class="vix-sub ' + (chg && v.chg_pct >= 0 ? 'vix-up' : 'vix-dn') + '">' +
+      (v.date || '') + ' ' + (chg ? (v.chg_pct > 0 ? '+' : '') + v.chg_pct.toFixed(2) + '%' : '') + '</div></div>');
+  }
+  // 美股三指数（红涨绿跌）
+  (d.us || []).forEach(u => {
+    const up = u.chg_pct >= 0;
+    cards.push('<div class="vix-card"><div class="vix-label">' + u.name + '</div>' +
+      '<div class="vix-val">' + u.value.toLocaleString() + '</div>' +
+      '<div class="vix-sub ' + (up ? 'vix-up' : 'vix-dn') + '">' + (up ? '+' : '') + u.chg_pct.toFixed(2) + '%</div></div>');
+  });
+  // A股 QVIX
+  (d.a_share || []).forEach(a => {
+    cards.push('<div class="vix-card"><div class="vix-label">' + a.name + ' QVIX' + vixTag(a.qvix, 45, 30) + '</div>' +
+      '<div class="vix-val">' + (a.qvix != null ? a.qvix : '—') + '</div>' +
+      '<div class="vix-sub">指数 ' + (a.value ?? '—') + ' · 20日波动 ' + (a.vol20 != null ? a.vol20.toFixed(1) + '%' : '—') + '</div></div>');
+  });
+  document.getElementById('vixCards').innerHTML = cards.join('') ||
+    '<p class="dr-note" style="grid-column:1/-1;margin:0">暂无波动率数据</p>';
+  document.getElementById('vixMeta').textContent = '数据日期 ' + (d.date || '');
+  if ((d.vix_history || []).length > 20) {
+    document.getElementById('vixChartWrap').style.display = '';
+    renderVixChart();
+  }
+}
+
+function renderVixChart() {
+  const dom = document.getElementById('vixChart');
+  if (!dom || !VIX_PANEL_DATA) return;
+  if (!_vixChart) _vixChart = echarts.init(dom);
+  const hist = VIX_PANEL_DATA.vix_history;
+  _vixChart.setOption({
+    backgroundColor: 'transparent',
+    grid: { left: 44, right: 16, top: 20, bottom: 26 },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: hist.map(h => h.date.slice(5)), axisLine: { lineStyle: { color: '#888' } },
+      axisLabel: { color: '#999', fontSize: 10 } },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: 'rgba(128,128,128,.15)' } },
+      axisLabel: { color: '#999', fontSize: 10 } },
+    series: [{ type: 'line', name: 'VIX', data: hist.map(h => h.close), symbol: 'none',
+      lineStyle: { width: 2, color: '#e53e3e' }, areaStyle: { color: 'rgba(229,62,62,.12)' },
+      markLine: { silent: true, symbol: 'none', label: { color: '#999', fontSize: 10 },
+        data: [{ yAxis: 30, lineStyle: { color: '#e53e3e', type: 'dashed' }, label: { formatter: '恐慌30' } },
+               { yAxis: 15, lineStyle: { color: '#22a861', type: 'dashed' }, label: { formatter: '平静15' } }] } }]
+  }, true);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadThermometer();
+  loadValRadar();
+  loadInstFlow();
+  loadVixPanel();
+});
 </script>
 
 <!-- 研报加强弹窗 -->
