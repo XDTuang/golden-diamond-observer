@@ -2841,6 +2841,9 @@ function renderFourVolumeChart(containerId, fv) {
 
 
 
+
+
+
 // ===== 每日复盘 Tab =====
 function renderDailyReview() {
   if (window._drInit) return; window._drInit = true;
@@ -2859,6 +2862,7 @@ function renderDailyReview() {
       drFillTables(q);
       if (d && d.us_kline) drRefreshUsDualDayTables(d);
       if (d && d.comm) drRefreshCommRates(d);
+      drDeriveSections(d);
       drLoadTop10();
       drLoadDiamond();
     }).catch(err => {
