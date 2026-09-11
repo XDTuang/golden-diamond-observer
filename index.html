@@ -2504,7 +2504,11 @@ function renderEmaScan() {
 // ===== 渲染全部 =====
 function renderAll() {
   const stocks = (window.SIGNALS_DATA.stocks||[]).filter(r => r.has_data);
-  document.getElementById('allGrid').innerHTML = stocks.length ? stocks.map(s => renderStockCard(s, 'all')).join('') : '<div class="empty-state"><div class="icon">📋</div>暂无数据</div>';
+  // 2026-09-11 防呆（空转容器清理同批）：allGrid 容器当前不存在于任何活文件
+  //   （无 data-tab="all" 按钮触发），原实现无 null 守卫 → 若将来加回该 tab 会立即 TypeError。
+  const el = document.getElementById('allGrid');
+  if (!el) return;
+  el.innerHTML = stocks.length ? stocks.map(s => renderStockCard(s, 'all')).join('') : '<div class="empty-state"><div class="icon">📋</div>暂无数据</div>';
 }
 
 // ===== 渲染观测池 =====
@@ -2859,7 +2863,6 @@ function renderDailyReview() {
       // 保留 analysis.html 的"3·隔夜美股复盘"模块（含 agent 推演结论），
       // 仅用 market.json.us_kline 把双日表数据+说明日期刷新到最新（drRefreshUsDualDayTables）
       ana.innerHTML = t;
-      drFillTables(q);
       if (d && d.us_kline) drRefreshUsDualDayTables(d);
       if (d && d.comm) drRefreshCommRates(d);
       drDeriveSections(d);
@@ -3020,25 +3023,6 @@ function drRefreshCommRates(d) {
       (latest || '—') + '；美元指数/伦铜无免费实时源，仍待本机补抓）</span>';
   }
 }
-function drFillTables(q) {
-  const mk = (items) => {
-    if (!items || !items.length) return '<div class="dr-note">【待本机补全】</div>';
-    let h = '<table class="dr-tbl"><thead><tr><th>名称</th><th>收盘</th><th>涨跌幅</th><th>最高</th><th>最低</th></tr></thead><tbody>';
-    items.forEach(v => {
-      const n = parseFloat(v.chg_pct);
-      const cls = n > 0 ? 'dr-up' : (n < 0 ? 'dr-dn' : '');
-      h += `<tr><td>${v.name}</td><td>${v.close}</td>
-        <td class="${cls}">${v.chg_pct}%</td><td>${v.high}</td><td>${v.low}</td></tr>`;
-    });
-    return h + '</tbody></table>';
-  };
-  const g = (group) => Object.values(q).filter(v => v.group === group && !v.error);
-  const tA = document.getElementById('drTblA'); if (tA) tA.innerHTML = mk(g('A股指数'));
-  const tH = document.getElementById('drTblH'); if (tH) tH.innerHTML = mk(g('持仓股'));
-  const tU = document.getElementById('drTblUs');
-  if (tU) tU.innerHTML = mk([...g('美股指数'), ...g('美股映射'), ...g('美股映射·参考')]);
-}
-
 // ===== 每日复盘：前一日 TOP10（output/top10_history.json 最新交易日）=====
 function drLoadTop10() {
   const el = document.getElementById('drTblTop10');
